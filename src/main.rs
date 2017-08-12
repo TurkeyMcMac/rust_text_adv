@@ -73,7 +73,7 @@ struct Stage {
 impl fmt::Display for Stage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}\n{}", self.info,
-            self.nexts.iter().enumerate()
+            self.nexts.iter().enumerate()      //    yellow    white
                 .map(|(i, &(ref c, _))| format!("    {}[33m[{}]{}[37m {}\n", 27 as char, &i + 1, 27 as char, c))
                 .collect::<String>()
         )
