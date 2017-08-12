@@ -44,9 +44,14 @@ impl Adventure {
 
             stage_next = loop {
                 let choice = loop {
+                    println!("Which option do you choose?");
+
                     let mut choice = String::new();
                     
-                    stdin().read_line(&mut choice).unwrap();
+                    if let Err(_) = stdin().read_line(&mut choice) {
+                        eprintln!("A line could not be read.");
+                        continue;
+                    }
                     
                     if let Ok(n) = choice.trim().parse::<usize>() {
                         break n;
