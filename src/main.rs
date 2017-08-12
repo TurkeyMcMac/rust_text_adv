@@ -51,7 +51,7 @@ impl Adventure {
                     if let Ok(n) = choice.trim().parse::<usize>() {
                         break n;
                     } else {
-                        eprintln!("That cannot be parsed as a number.");
+                        eprintln!("That cannot be parsed as positive integer.");
                     }
                 } - 1;
 
