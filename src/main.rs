@@ -1,32 +1,81 @@
+#[macro_use]
+extern crate lazy_static;
+
+extern crate regex;
+use regex::{Regex, RegexBuilder};
+
 use std::collections::HashMap;
 use std::fmt;
-use std::io::stdin;
+use std::fs::File;
+use std::io::{stdin, Read, BufReader};
 
 fn main() {
-    let text_adv = Adventure {
-        stages: {
-            let mut temp = HashMap::new();
+    let file = std::env::args().skip(1).next()
+        .expect("A filename is required as the first argument");
 
-            temp.insert("BEGIN".to_owned(), Stage {
-                info: "The beginning.".to_owned(),
-                nexts: vec![(String::new(), String::new()), ("foo".to_owned(), "Middle".to_owned())],
-            });
-            temp.insert("Middle".to_owned(), Stage {
-                info: "The middle.".to_owned(),
-                nexts: vec![("ix".to_owned(), String::new()), ("bar".to_owned(), "END".to_owned())],
-            });
-            temp
-        },
-    };
 
+    let file = File::open(file)
+        .expect("Unable to open file");
+    
+    let mut text = String::new();
+    
+    BufReader::new(file).read_to_string(&mut text)
+        .expect("Could not read file as string");
+
+    let text_adv = Adventure::read_from(&text);
+    
     text_adv.run();
 }
 
-struct Adventure {
-    stages: HashMap<String, Stage>
+#[derive(Debug)]
+struct Adventure<'a> {
+    stages: HashMap<&'a str, Stage<'a>>
 }
 
-impl Adventure {
+impl <'a> Adventure<'a> {
+    fn read_from(source: &'a str) -> Adventure<'a> {
+        lazy_static! {
+            static ref PATTERN: Regex = RegexBuilder::new(r"\s*(@|-)\s*`(.*?)`\s*`(.*?)`")
+                .multi_line(true)
+                .dot_matches_new_line(true)
+                .build().unwrap();
+        }
+        
+        let mut adventure = Adventure {
+            stages: HashMap::<&'a str, Stage<'a>>::new(),
+        };
+        
+        let mut stage_id = None;
+        let mut stage: Option<Stage<'a>> = None;
+        
+        for s in source.split(',') {
+            if let Some(s) = PATTERN.captures(s) {
+                match s.get(1).unwrap().as_str() {
+                    "@" => {
+                        if let Some(stage) = stage {
+                            adventure.stages.insert(stage_id.unwrap(), stage);
+                        }
+
+                        stage_id = Some(s.get(2).unwrap().as_str());
+                        stage = Some(Stage {
+                            info: s.get(3).unwrap().as_str(),
+                            nexts: Vec::new(),
+                        });
+                    },
+                    "-" => if let Some(ref mut stage) = stage {
+                        stage.nexts.push((s.get(2).unwrap().as_str(), s.get(3).unwrap().as_str()));
+                    },
+                    _ => unreachable!(),
+                }
+            }
+        }
+        if let Some(stage) = stage {
+            adventure.stages.insert(stage_id.unwrap(), stage);
+        }
+
+        adventure
+    }
+
     fn run(&self) {
         let mut stage_next = self.stages.get("BEGIN"); 
         
@@ -60,7 +109,7 @@ impl Adventure {
                     }
                 } - 1;
 
-                if let Some(&(_, ref next)) = stage.nexts.get(choice) {
+                if let Some(&(_, next)) = stage.nexts.get(choice) {
                     break self.stages.get(next);
                 } else {
                     eprintln!("There aren't that many choices!");
@@ -70,16 +119,17 @@ impl Adventure {
     }
 }
 
-struct Stage {
-    info: String,
-    nexts: Vec<(String, String)>,
+#[derive(Debug)]
+struct Stage<'a> {
+    info: &'a str,
+    nexts: Vec<(&'a str, &'a str)>,
 }
 
-impl fmt::Display for Stage {
+impl <'a> fmt::Display for Stage<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}\n{}", self.info,
             self.nexts.iter().enumerate()      //    yellow    white
-                .map(|(i, &(ref c, _))| format!("    {}[33m[{}]{}[37m {}\n", 27 as char, &i + 1, 27 as char, c))
+                .map(|(i, &(c, _))| format!("    {}[33m[{}]{}[37m {}\n", 27 as char, &i + 1, 27 as char, c))
                 .collect::<String>()
         )
     }
