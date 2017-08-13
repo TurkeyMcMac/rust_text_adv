@@ -5,8 +5,8 @@ extern crate regex;
 use regex::{Regex, RegexBuilder};
 
 use std::collections::HashMap;
+use std::error::Error;
 use std::fmt;
-use std::io::stdin;
 
 #[derive(Debug)]
 pub struct Adventure<'a> {
@@ -57,51 +57,62 @@ impl <'a> Adventure<'a> {
         adventure
     }
 
-    pub fn run(&self) {
-        let mut stage_next = self.stages.get("BEGIN"); 
-        
-        loop {
-            let stage = match stage_next {
-                Some(s) => {
-                    println!("{}", s);
-                    s
-                },
-                None    => {
-                    println!("\n\n    The End.\n\n");
-                    break;
-                },
-            };
+    pub fn get(&self, stage: &str) -> Option<&Stage<'a>> { self.stages.get(stage) }
+}
 
-            stage_next = loop {
-                let choice = loop {
-                    println!("Which option do you choose?");
+pub struct Adventurer<'a> {
+    adventure: &'a Adventure<'a>,
+    choices: &'a Vec<(&'a str, &'a str)>,
+}
 
-                    let mut choice = String::new();
-                    
-                    if let Err(_) = stdin().read_line(&mut choice) {
-                        eprintln!("A line could not be read.");
-                        continue;
-                    }
-                    
-                    if let Ok(n) = choice.trim().parse::<usize>() {
-                        break n;
-                    } else {
-                        eprintln!("That cannot be parsed as positive integer.");
-                    }
-                } - 1;
+impl <'a> Adventurer<'a> {
+    pub fn new(adventure: &'a Adventure<'a>, begin: &'a Stage<'a>) -> Adventurer<'a> {
+        Adventurer {
+            adventure,
+            choices: &begin.nexts,
+        }
+    }
 
-                if let Some(&(_, next)) = stage.nexts.get(choice) {
-                    break self.stages.get(next);
-                } else {
-                    eprintln!("There aren't that many choices!");
+    pub fn choose(&mut self, choice: usize) -> Result<Option<&Stage>, InvalidChoiceError> {
+        match self.choices.get(choice) {
+            Some(&(_, s)) => {
+                let new_stage = self.adventure.get(s);
+
+                if let Some(stage) = new_stage {
+                    self.choices = &stage.nexts;
                 }
-            }
+
+                Ok(new_stage)
+            },
+            None    => Err(InvalidChoiceError {
+                number_chosen: choice + 1,
+                choice_number: self.choices.len(),
+            }),
         }
     }
 }
 
 #[derive(Debug)]
-struct Stage<'a> {
+pub struct InvalidChoiceError {
+    number_chosen: usize,
+    choice_number: usize,
+}
+
+impl Error for InvalidChoiceError {
+    fn description(&self) -> &str {
+        "There aren't that many choices"
+    }
+}
+
+impl fmt::Display for InvalidChoiceError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Choice #{} was picked when only {} were available",
+            self.number_chosen, self.choice_number)
+    }
+}
+
+#[derive(Debug)]
+pub struct Stage<'a> {
     info: &'a str,
     nexts: Vec<(&'a str, &'a str)>,
 }
