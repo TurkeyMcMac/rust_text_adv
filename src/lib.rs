@@ -29,7 +29,7 @@ impl <'a> Adventure<'a> {
         let mut stage_id = None;
         let mut stage: Option<Stage<'a>> = None;
         
-        for s in source.split(',') {
+        for s in source.split('\\') {
             if let Some(s) = PATTERN.captures(s) {
                 match s.get(1).unwrap().as_str() {
                     "@" => {
